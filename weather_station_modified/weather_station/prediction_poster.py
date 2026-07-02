@@ -18,6 +18,46 @@ import time
 import urllib.request
 from collections import deque
 from queue import Empty, Queue
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+# Thread-safe storage for HTTP live telemetry server
+_http_server_lock = threading.Lock()
+_latest_prediction_payload: dict = {}
+_prediction_history: list[dict] = []
+
+class LiveDataHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/live":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, Accept")
+            self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+            self.end_headers()
+            
+            with _http_server_lock:
+                latest = _latest_prediction_payload
+                history = list(_prediction_history)
+                
+            response_data = {
+                "latest": latest if latest else None,
+                "history": list(reversed(history)),
+                "status": "Running"
+            }
+            self.wfile.write(json.dumps(response_data).encode("utf-8"))
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Accept")
+        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.end_headers()
+
+    def log_message(self, format, *args):
+        pass # Suppress command line logging of requests
 
 # Project imports
 from config.config import CFG
@@ -100,6 +140,28 @@ def run_headless():
 
     sample_queue: Queue[SensorSample] = Queue(maxsize=500)
     stop_event = threading.Event()
+
+    # Start local HTTP server on port 8080/8081 for direct Pages connection (CORS enabled)
+    def start_local_server():
+        try:
+            server = HTTPServer(("127.0.0.1", 8080), LiveDataHandler)
+            log_technical("Local HTTP Server started on http://127.0.0.1:8080/live")
+        except Exception as e:
+            try:
+                server = HTTPServer(("127.0.0.1", 8081), LiveDataHandler)
+                log_technical("Local HTTP Server started on http://127.0.0.1:8081/live")
+            except Exception as e2:
+                log_technical(f"Could not bind HTTP server on port 8080 or 8081: {e2}")
+                return
+        
+        server.timeout = 0.5
+        while not stop_event.is_set():
+            server.handle_request()
+        server.server_close()
+        log_technical("Local HTTP Server stopped")
+
+    server_thread = threading.Thread(target=start_local_server, daemon=True)
+    server_thread.start()
 
     # Loggers
     stream_logger = CSVLogger(
@@ -212,6 +274,14 @@ def run_headless():
                     "predicted_temperature": make_float_safe(pred_next)
                 }
             }
+
+            # Update local telemetry server data
+            global _latest_prediction_payload, _prediction_history
+            with _http_server_lock:
+                _latest_prediction_payload = payload
+                _prediction_history.append(payload)
+                if len(_prediction_history) > 100:
+                    _prediction_history.pop(0)
 
             # Attempt posting prediction
             success = post_prediction(api_url, payload)

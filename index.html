@@ -240,19 +240,6 @@
               <small>Allows query of specific days for seasonal trends.</small>
             </div>
 
-            <div class="field">
-              <label for="conditionSelect">Target Condition (Optional)</label>
-              <select class="control control-select" id="conditionSelect">
-                <option value="">Auto-detect highest risk condition</option>
-                <option value="very-hot">Very Hot (Tmax ≥ 35°C)</option>
-                <option value="very-cold">Very Cold (Tmin ≤ 5°C)</option>
-                <option value="very-wet">Very Wet (Precip ≥ 5 mm/day)</option>
-                <option value="very-windy">Very Windy (Wind ≥ 8 m/s)</option>
-                <option value="very-uncomfortable">Very Uncomfortable (Heat Index ≥ 38°C)</option>
-              </select>
-              <small>Select a specific weather condition to analyze, or let the dashboard determine the highest risk one.</small>
-            </div>
-
             <input type="hidden" id="lat" value="" />
             <input type="hidden" id="lon" value="" />
 
@@ -398,18 +385,6 @@
           </div>
         </div>
 
-        <!-- NASA Dataset Source Catalog -->
-        <section class="surface panel source-list-card">
-          <div class="panel-header" style="margin-bottom: 8px;">
-            <div>
-              <h2 style="margin: 0 0 6px 0;">NASA Earth Science Source Catalog</h2>
-              <p style="margin: 0; color: var(--muted); font-size: 0.9rem;">Official datasets and visualization references referenced in calculations.</p>
-            </div>
-          </div>
-          <div class="source-grid" id="sources-container">
-            <!-- Filled dynamically -->
-          </div>
-        </section>
       </div>
     </div>
   </div>
@@ -425,8 +400,12 @@
     let simulationInterval = null;
     let localPollingInterval = null;
     let lastQueryReport = null; // Stored to enable client-side downloads
-    
-    const LOCAL_API_URL = "http://localhost/Final/Nasa_Oct/api_prediction.php";
+    const TELEMETRY_ENDPOINTS = [
+      "http://127.0.0.1:8080/live",
+      "http://127.0.0.1:8081/live",
+      "http://localhost/Final/Nasa_Oct/api_prediction.php"
+    ];
+    let activeEndpoint = null;
     const START_YEAR = 1985;
     const WINDOW_DAYS = 7;
     
@@ -634,16 +613,16 @@
       // Setup Chart.js first with empty/loading state
       initAIChart([], [], []);
       
-      // Try local XAMPP first
-      checkLocalConnection()
-        .then(isLocalAvailable => {
-          if (isLocalAvailable) {
-            // Local XAMPP API is active! Start polling local API
-            document.getElementById("api-status-chip").innerText = "Local Telemetry Active";
+      findActiveEndpoint()
+        .then(endpoint => {
+          if (endpoint) {
+            activeEndpoint = endpoint;
+            let label = endpoint.includes("api_prediction.php") ? "Local XAMPP" : "Live Sensor";
+            document.getElementById("api-status-chip").innerText = `${label} Active`;
             document.getElementById("api-status-chip").style.color = "var(--success)";
             document.getElementById("api-status-chip").style.borderColor = "var(--success)";
-            pollLocalTelemetry();
-            localPollingInterval = setInterval(pollLocalTelemetry, 4000);
+            pollTelemetry();
+            localPollingInterval = setInterval(pollTelemetry, 4000);
           } else {
             // Fallback to Simulated Live Demo Mode
             startSimulatedTelemetry();
@@ -654,25 +633,36 @@
         });
     }
 
-    function checkLocalConnection() {
-      return fetch(LOCAL_API_URL, { method: 'GET', mode: 'cors' })
-        .then(res => res.ok)
-        .catch(() => false);
+    async function findActiveEndpoint() {
+      for (const url of TELEMETRY_ENDPOINTS) {
+        try {
+          const res = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-store' });
+          if (res.ok) {
+            return url;
+          }
+        } catch (e) {
+          // ignore and check next
+        }
+      }
+      return null;
     }
 
-    function pollLocalTelemetry() {
-      fetch(LOCAL_API_URL, { method: 'GET', mode: 'cors' })
+    function pollTelemetry() {
+      if (!activeEndpoint) return;
+      fetch(activeEndpoint, { method: 'GET', mode: 'cors', cache: 'no-store' })
         .then(res => {
           if (!res.ok) throw new Error("Offline");
           return res.json();
         })
         .then(data => {
-          updateAIDashboardUI(data, "Local Station");
+          let label = activeEndpoint.includes("api_prediction.php") ? "Local XAMPP" : "Live Sensor";
+          updateAIDashboardUI(data, label);
         })
         .catch(err => {
-          console.warn("Connection to local telemetry dropped, transitioning to simulation...", err);
+          console.warn("Connection to telemetry endpoint dropped, retrying lookup...", err);
           clearInterval(localPollingInterval);
-          startSimulatedTelemetry();
+          // Try to reconnect or fall back to simulation
+          initTelemetry();
         });
     }
 
@@ -891,7 +881,7 @@
         
         const placeVal = document.getElementById("place").value.trim();
         const dateVal = document.getElementById("targetDate").value;
-        const targetCond = document.getElementById("conditionSelect").value;
+        const targetCond = "";
         
         let latVal = document.getElementById("lat").value;
         let lonVal = document.getElementById("lon").value;
@@ -1375,6 +1365,7 @@
 
     function renderSourcesCatalog(sources) {
       const container = document.getElementById("sources-container");
+      if (!container) return;
       container.innerHTML = "";
       
       sources.forEach(src => {
