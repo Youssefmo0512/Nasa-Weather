@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Earth Cast - Premium NASA Dashboard</title>
+  
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="./assets/css/style.css">
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- Hero Header -->
+    <header class="header glass-panel">
+      <h1>NASA Earth Observation</h1>
+      <p>Next-Generation Predictive Weather Analysis</p>
+    </header>
+
+    <main class="main-content">
+      
+      <!-- left Sidebar: Form -->
+      <aside class="sidebar glass-panel">
+        <h3><i class="fa-solid fa-satellite"></i> Analysis Parameters</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+          Select coordinates on the map or enter them below to begin prediction analysis.
+        </p>
+        
+        <form id="weatherForm">
+          <div class="form-group mb-3">
+            <label for="location">Target Location</label>
+            <input type="text" id="location" placeholder="e.g. 26.8206, 30.8025" required>
+          </div>
+          
+          <div class="form-group mb-3">
+            <label for="date">Observation Date</label>
+            <input type="date" id="date" required>
+          </div>
+          
+          <div class="form-group mb-4">
+            <label for="condition">Weather Phenomenon</label>
+            <select id="condition" required>
+              <option value="" disabled selected>Select parameter...</option>
+              <option value="very-hot">Extreme Heat</option>
+              <option value="very-cold">Extreme Cold</option>
+              <option value="very-wet">Heavy Precipitation</option>
+              <option value="very-windy">High Winds</option>
+              <option value="very-uncomfortable">Thermal Discomfort</option>
+            </select>
+          </div>
+          
+          <button type="submit" class="btn-primary" id="submitBtn">
+            <span class="btn-text">Execute Analysis</span>
+            <div class="loader"></div>
+            <i class="fa-solid fa-microchip"></i>
+          </button>
+        </form>
+      </aside>
+
+      <!-- Right Area: Map & Results -->
+      <section class="display-area">
+        
+        <!-- Interactive Map -->
+        <div class="map-container glass-panel">
+          <div id="map" style="width: 100%; height: 100%;"></div>
+        </div>
+
+        <!-- Dynamic Results (Hidden initially) -->
+        <div class="results-container glass-panel" id="resultsArea">
+          <div class="results-header" style="margin-bottom: 2rem; display: flex; align-items: center; justify-content: space-between;">
+            <h3><i class="fa-solid fa-chart-pie" style="color: var(--primary);"></i> Intelligence Report</h3>
+            <span style="font-size: 0.8rem; background: rgba(0, 242, 254, 0.2); padding: 5px 10px; border-radius: 20px; color: var(--primary); border: 1px solid var(--primary);">PROCESSING COMPLETE</span>
+          </div>
+
+          <div class="results-grid">
+            <!-- Chart Area -->
+            <div class="chart-wrapper">
+              <canvas id="probabilityChart"></canvas>
+            </div>
+            
+            <!-- Contextual Stats -->
+            <div class="stats-panel">
+              <div class="stat-item">
+                <div class="stat-icon"><i class="fa-solid fa-location-crosshairs"></i></div>
+                <div class="stat-info">
+                  <h4>Investigated Vector</h4>
+                  <span id="res-location">--</span>
+                </div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-icon"><i class="fa-regular fa-calendar-check"></i></div>
+                <div class="stat-info">
+                  <h4>Temporal Target</h4>
+                  <span id="res-date">--</span>
+                </div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-icon"><i class="fa-solid fa-temperature-half"></i></div>
+                <div class="stat-info">
+                  <h4>Condition Signature</h4>
+                  <span id="res-condition" style="color: var(--primary);">--</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+    </main>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- Chart JS -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Custom Application Logic -->
+  <script src="./assets/js/app.js"></script>
+
+</body>
+</html>

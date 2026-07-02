@@ -1,0 +1,250 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Cairo', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    direction: rtl;
+}
+
+.app-container {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Header */
+.app-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.app-header h1 {
+    color: white;
+    font-size: 2rem;
+    font-weight: 700;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+ /* Cards */
+.card {
+    background: white;
+    border-radius: 24px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.card-content {
+    padding: 20px;
+}
+
+/* Header Card */
+.header-card {
+    background: linear-gradient(135deg, #4B8BBE, #306998);
+    color: white;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.header-icon {
+    font-size: 44px;
+}
+
+.header-text p {
+    margin-bottom: 8px;
+    font-size: 1.1rem;
+}
+
+/* Form Styles  */
+.form-group {
+    margin-bottom: 12px;
+}
+
+.form-row {
+    display: flex;
+    gap: 12px;
+}
+
+.form-row .form-group {
+    flex: 1;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+}
+
+input[type="text"],
+input[type="date"] {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #e1e5e9;
+    border-radius: 12px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+input[type="text"]:focus,
+input[type="date"]:focus {
+    outline: none;
+    border-color: #4B8BBE;
+}
+
+input[readonly] {
+    background-color: #f8f9fa;
+    color: #6c757d;
+}
+
+small {
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+/* Buttons */
+.form-actions {
+    margin-top: 12px;
+}
+
+.btn-primary {
+    width: 100%;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #4B8BBE, #306998);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(75, 139, 190, 0.4);
+}
+
+.btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Loading Spinner  */
+.loading-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid transparent;
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+/* Results */
+.results-header {
+    margin-bottom: 16px;
+}
+
+.results-header h3 {
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.results-header p {
+    color: #6c757d;
+}
+
+.divider {
+    height: 1px;
+    background: #e1e5e9;
+    margin: 16px 0;
+}
+
+/* Stats Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
+}
+
+.stat-card {
+    border: 2px solid #e1e5e9;
+    border-radius: 20px;
+    padding: 16px;
+    transition: all 0.3s;
+}
+
+.stat-card:hover {
+    border-color: #4B8BBE;
+    transform: translateY(-2px);
+}
+
+.stat-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.stat-header .material-icons {
+    color: #4B8BBE;
+}
+
+.stat-title {
+    font-weight: 600;
+    color: #333;
+}
+
+.stat-values {
+    margin-top: 8px;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.stat-value {
+    font-weight: bold;
+    color: #333;
+}
+
+@media (max-width: 768px) {
+    .app-container {
+        padding: 10px;
+    }
+    
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+} 
