@@ -348,10 +348,6 @@
                 </div>
               </div>
 
-              <div class="download-row" style="margin-top: 18px;">
-                <button class="download-link" id="btn-download-json" style="flex: 1; font-family: inherit;">Download JSON</button>
-                <button class="download-link" id="btn-download-csv" style="flex: 1; font-family: inherit;">Download CSV</button>
-              </div>
             </section>
 
             <!-- Climate Averages block -->
@@ -1380,78 +1376,7 @@
       });
     }
 
-    // --- CLIENT-SIDE DOWNLOAD HANDLERS ---
-    document.getElementById("btn-download-json").addEventListener("click", () => {
-      if (!lastQueryReport) return;
-      const downloadPayload = {
-        query: {
-          place: lastQueryReport.query.place,
-          target_date: lastQueryReport.query.targetDate,
-          condition: conditionLabels[lastQueryReport.query.condition],
-          latitude: lastQueryReport.query.lat,
-          longitude: lastQueryReport.query.lon
-        },
-        results: lastQueryReport.result,
-        sources: lastQueryReport.sources,
-        metadata: {
-          app: "NASA Weather",
-          version: "1.0-Static",
-          generated_at: new Date().toISOString()
-        }
-      };
-      
-      const jsonStr = JSON.stringify(downloadPayload, null, 2);
-      const blob = new Blob([jsonStr], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `nasa-weather-${lastQueryReport.query.condition}-${lastQueryReport.query.targetDate}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    });
 
-    document.getElementById("btn-download-csv").addEventListener("click", () => {
-      if (!lastQueryReport) return;
-      
-      const csvRows = [];
-      csvRows.push(['field', 'value'].join(','));
-      csvRows.push(['place', `"${lastQueryReport.query.place.replace(/"/g, '""')}"`].join(','));
-      csvRows.push(['target_date', lastQueryReport.query.targetDate].join(','));
-      csvRows.push(['condition', conditionLabels[lastQueryReport.query.condition]].join(','));
-      csvRows.push(['latitude', lastQueryReport.query.lat.toFixed(5)].join(','));
-      csvRows.push(['longitude', lastQueryReport.query.lon.toFixed(5)].join(','));
-      csvRows.push(['likelihood_score', lastQueryReport.result.probability].join(','));
-      
-      let riskLabel = 'Lower Likelihood';
-      if (lastQueryReport.result.probability >= 75) riskLabel = 'High Likelihood';
-      else if (lastQueryReport.result.probability >= 50) riskLabel = 'Elevated Likelihood';
-      else if (lastQueryReport.result.probability >= 30) riskLabel = 'Moderate Likelihood';
-      csvRows.push(['risk_band', riskLabel].join(','));
-      
-      csvRows.push(['sample_count', lastQueryReport.result.sample_count].join(','));
-      csvRows.push(['year_count', lastQueryReport.result.year_count].join(','));
-      csvRows.push(['seasonal_trend_signal', lastQueryReport.result.trend_delta].join(','));
-      
-      for (const key in lastQueryReport.result.probabilities) {
-        csvRows.push([`probability_${key}`, lastQueryReport.result.probabilities[key]].join(','));
-      }
-      for (const key in lastQueryReport.result.summary) {
-        csvRows.push([`summary_${key}`, lastQueryReport.result.summary[key]].join(','));
-      }
-      
-      const csvContent = csvRows.join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `nasa-weather-${lastQueryReport.query.condition}-${lastQueryReport.query.targetDate}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    });
   </script>
 </body>
 </html>
