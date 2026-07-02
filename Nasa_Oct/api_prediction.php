@@ -1,4 +1,12 @@
 <?php
+// CORS Headers to allow GitHub Pages and local client-side testing
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Headers: Content-Type, Accept");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
+
 require_once 'config.php';
 setupSession();
 

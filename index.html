@@ -1,0 +1,1466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NASA Weather | Intelligence Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="./Nasa_Oct/assets/css/app.css" />
+  <style>
+    /* Additional custom styles for SPA transitions and layout polish */
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-left: 10px;
+      vertical-align: middle;
+      display: none;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .btn-main.is-loading .loading-spinner {
+      display: inline-block;
+    }
+    .btn-main.is-loading .loading-dot {
+      display: none;
+    }
+    .results-section {
+      display: none;
+      margin-top: 32px;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .results-section.show {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .error-narrative {
+      background: rgba(239, 68, 68, 0.08) !important;
+      border: 1px solid rgba(239, 68, 68, 0.15) !important;
+      color: #ef4444;
+    }
+    .source-link {
+      display: inline-block;
+      margin-right: 15px;
+      margin-bottom: 8px;
+      font-size: 0.88rem;
+    }
+    .source-list-card {
+      margin-top: 14px;
+      padding: 26px;
+    }
+    .source-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-top: 12px;
+    }
+    .source-item {
+      padding: 14px;
+      border-radius: 12px;
+      background: var(--bg-soft);
+      border: 1px solid var(--panel-border);
+    }
+    .source-item strong {
+      display: block;
+      font-size: 0.95rem;
+      margin-bottom: 4px;
+    }
+    .source-item p {
+      margin: 0 0 8px 0;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .source-item a {
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+    .control-select {
+      appearance: none;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23607089' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: right 16px center;
+      background-size: 16px;
+      padding-right: 40px !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar surface reveal is-visible">
+      <div class="brand">
+        <div class="brand-badge">NW</div>
+        <div class="brand-text">
+          <strong>NASA Weather Dashboard</strong>
+          <span>AI prediction & NASA climate analytics portal</span>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <div class="mini-chip" id="timezone-chip">Cairo, EG timezone</div>
+        <div class="mini-chip" id="api-status-chip" style="font-weight: bold; border-color: var(--panel-border);">
+          Connecting...
+        </div>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="hero-panel surface reveal is-visible">
+        <div class="eyebrow">Advanced Climate Intel</div>
+        <h1>NASA Weather Intelligence Portal</h1>
+        <p>
+          Access live machine learning forecasts and run long-term seasonal analyses using NASA Earth observation datasets.
+        </p>
+      </div>
+    </section>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs-nav reveal is-visible">
+      <button class="tab-btn is-active" id="tab-ai-btn" onclick="switchTab('ai-dashboard', event)">AI Prediction Dashboard</button>
+      <button class="tab-btn" id="tab-nasa-btn" onclick="switchTab('nasa-explorer', event)">NASA/Giovanni Dataset Explorer</button>
+    </div>
+
+    <!-- TAB 1: AI Prediction Dashboard -->
+    <div id="ai-dashboard" class="tab-content is-active reveal is-visible">
+      <!-- Status & Summary Cards -->
+      <div class="dashboard-grid">
+        <div class="dashboard-card">
+          <div class="card-label">Predicted Temp</div>
+          <div class="card-value" id="card-predicted-temp">--°C</div>
+          <div class="card-subtext">ML model next-step prediction</div>
+        </div>
+        <div class="dashboard-card">
+          <div class="card-label">Current Humidity</div>
+          <div class="card-value" id="card-humidity">--%</div>
+          <div class="card-subtext">Live streaming sensor reading</div>
+        </div>
+        <div class="dashboard-card">
+          <div class="card-label">Current Pressure</div>
+          <div class="card-value" id="card-pressure">-- hPa</div>
+          <div class="card-subtext">Live streaming sensor reading</div>
+        </div>
+        <div class="dashboard-card">
+          <div class="card-label">Forecast Condition</div>
+          <div class="card-value" id="card-condition">--</div>
+          <div class="card-subtext" id="card-confidence">Confidence: --%</div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+        <div class="dashboard-card" style="flex-direction: row; gap: 14px; align-items: center;">
+          <div>
+            <div class="card-label">Prediction Status</div>
+            <div class="card-value" id="card-status" style="font-size: 1.3rem;">Initializing...</div>
+          </div>
+        </div>
+        <div class="dashboard-card" style="flex-direction: row; gap: 14px; align-items: center;">
+          <div>
+            <div class="card-label">Last Prediction Time</div>
+            <div class="card-value" id="card-last-time" style="font-size: 1.2rem;">--:--:--</div>
+          </div>
+        </div>
+        <div class="dashboard-card" style="flex-direction: row; gap: 14px; align-items: center;">
+          <div>
+            <div class="card-label">Prediction Source</div>
+            <div class="card-value" id="card-source" style="font-size: 1.2rem;">AI Prediction / Dataset</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chart and Historical Table -->
+      <div class="layout-grid" style="grid-template-columns: 1.6fr 0.9fr; margin-top: 24px;">
+        <div class="surface panel">
+          <h2 style="margin-top: 0;">AI Temperature Trend</h2>
+          <p style="color: var(--muted); margin-bottom: 12px;">Real-time comparison of predicted vs actual sensor values.</p>
+          <div class="chart-shell">
+            <canvas id="predictionChart"></canvas>
+          </div>
+        </div>
+
+        <div class="surface panel" style="max-height: 480px; display: flex; flex-direction: column;">
+          <h2 style="margin-top: 0;">Recent Logs</h2>
+          <div class="history-table-wrapper" style="flex: 1; overflow-y: auto; margin-top: 8px;">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Actual</th>
+                  <th>Predicted</th>
+                  <th>Forecast</th>
+                </tr>
+              </thead>
+              <tbody id="history-table-body">
+                <tr>
+                  <td colspan="4" style="text-align: center; color: var(--muted);">No predictions received yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: NASA/Giovanni Dataset Explorer -->
+    <div id="nasa-explorer" class="tab-content reveal">
+      <div class="layout-grid">
+        <!-- Form Panel -->
+        <div class="surface panel">
+          <div class="panel-header">
+            <div>
+              <h2 style="margin-top: 0;">NASA/Giovanni Seasonal Analysis</h2>
+              <p>Query a place and target date to calculate the historical likelihood of extreme weather conditions from 1985 to present.</p>
+            </div>
+          </div>
+
+          <form id="weatherForm" class="field-grid">
+            <div class="field">
+              <label for="place">Location Name</label>
+              <div class="input-with-action">
+                <input class="control" type="text" id="place" placeholder="Cairo, Egypt or 30.0444, 31.2357" required />
+                <button type="button" id="geoButton" class="btn-action" title="Use current location">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="geo-icon"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                </button>
+              </div>
+              <small>Input a location name or click direct coordinate points on the map.</small>
+            </div>
+
+            <div class="field">
+              <label for="targetDate">Target Date</label>
+              <input class="control" type="date" id="targetDate" required />
+              <small>Allows query of specific days for seasonal trends.</small>
+            </div>
+
+            <div class="field">
+              <label for="conditionSelect">Target Condition (Optional)</label>
+              <select class="control control-select" id="conditionSelect">
+                <option value="">Auto-detect highest risk condition</option>
+                <option value="very-hot">Very Hot (Tmax ≥ 35°C)</option>
+                <option value="very-cold">Very Cold (Tmin ≤ 5°C)</option>
+                <option value="very-wet">Very Wet (Precip ≥ 5 mm/day)</option>
+                <option value="very-windy">Very Windy (Wind ≥ 8 m/s)</option>
+                <option value="very-uncomfortable">Very Uncomfortable (Heat Index ≥ 38°C)</option>
+              </select>
+              <small>Select a specific weather condition to analyze, or let the dashboard determine the highest risk one.</small>
+            </div>
+
+            <input type="hidden" id="lat" value="" />
+            <input type="hidden" id="lon" value="" />
+
+            <div class="button-row" style="margin-top: 14px;">
+              <button id="submitButton" type="submit" class="btn-main" style="width: 100%;">
+                <span>Run likelihood analysis</span>
+                <span class="loading-spinner"></span>
+                <span class="loading-dot"></span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Interactive Map Panel -->
+        <div class="surface map-card" style="padding: 26px;">
+          <div class="panel-header" style="margin-bottom: 12px;">
+            <div>
+              <h2 style="margin: 0 0 4px 0;">Interactive Query Map</h2>
+              <p style="margin: 0; color: var(--muted); font-size: 0.9rem;">Drop a pin to lock coordinates, coordinates will sync automatically.</p>
+            </div>
+          </div>
+          <div class="map-shell">
+            <div class="map-overlay">
+              <strong>Spatial selection</strong>
+              <p>Click anywhere to select coordinates. The form will sync automatically.</p>
+            </div>
+            <div id="map" aria-label="Interactive map for choosing location"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESULTS SECTION (Generated dynamically on analysis completion) -->
+      <div id="resultsSection" class="results-section">
+        <div class="results-grid">
+          <div class="stack">
+            <!-- Headline weather condition block -->
+            <section class="weather-status-card">
+              <div class="weather-status-emoji" id="res-emoji">🌤️</div>
+              <div class="weather-status-label" id="res-condition-label">Weather Condition</div>
+              <div class="weather-status-likelihood" id="res-likelihood">
+                Likelihood: --%
+              </div>
+              <div style="margin-top: 14px;">
+                <span class="badge" id="res-badge" style="font-size: 0.95rem; padding: 6px 16px;">
+                  Lower Likelihood
+                </span>
+              </div>
+              <p style="color: var(--muted); font-size: 0.9rem; margin-top: 16px; margin-bottom: 0;" id="res-meta-years">
+                Based on -- years of historical observations
+              </p>
+            </section>
+
+            <!-- Chart block -->
+            <section class="chart-card surface">
+              <div class="panel-header" style="margin-bottom: 8px;">
+                <div>
+                  <h2 style="margin: 0 0 6px 0;">Comparison View</h2>
+                  <p style="margin: 0; color: var(--muted); font-size: 0.9rem;">Probabilities of other extreme factors around the same date.</p>
+                </div>
+              </div>
+              <div class="chart-shell">
+                <canvas id="comparisonChart" aria-label="Comparison chart"></canvas>
+              </div>
+              <div class="narrative" id="res-narrative-container">
+                <p id="res-narrative">
+                  --
+                </p>
+              </div>
+            </section>
+          </div>
+
+          <div class="stack">
+            <!-- Summary block -->
+            <section class="summary-card surface">
+              <div class="panel-header" style="margin-bottom: 8px;">
+                <div>
+                  <h2 style="margin: 0 0 6px 0;">Query Summary</h2>
+                  <p style="margin: 0; color: var(--muted); font-size: 0.9rem;">Calculated coordinates and metrics.</p>
+                </div>
+              </div>
+
+              <div class="summary-list">
+                <div class="summary-item">
+                  <span>Location</span>
+                  <strong id="sum-place">--</strong>
+                </div>
+                <div class="summary-item">
+                  <span>Date</span>
+                  <strong id="sum-date">--</strong>
+                </div>
+                <div class="summary-item">
+                  <span>Condition Type</span>
+                  <strong id="sum-condition">--</strong>
+                </div>
+                <div class="summary-item">
+                  <span>Coordinates</span>
+                  <strong id="sum-coords">--</strong>
+                </div>
+                <div class="summary-item">
+                  <span>Sample Count</span>
+                  <strong id="sum-samples">--</strong>
+                </div>
+                <div class="summary-item">
+                  <span>Trend Delta</span>
+                  <strong id="sum-trend">--</strong>
+                </div>
+              </div>
+
+              <div class="download-row" style="margin-top: 18px;">
+                <button class="download-link" id="btn-download-json" style="flex: 1; font-family: inherit;">Download JSON</button>
+                <button class="download-link" id="btn-download-csv" style="flex: 1; font-family: inherit;">Download CSV</button>
+              </div>
+            </section>
+
+            <!-- Climate Averages block -->
+            <section class="detail-card surface" style="margin-top: 14px;">
+              <div class="panel-header" style="margin-bottom: 8px;">
+                <div>
+                  <h2 style="margin: 0 0 6px 0;">Historical Climate Averages</h2>
+                  <p style="margin: 0; color: var(--muted); font-size: 0.9rem;">Mean daily parameters computed for this seasonal window.</p>
+                </div>
+              </div>
+
+              <div class="detail-list">
+                <div class="detail-item">
+                  <span>Average Max Temperature</span>
+                  <strong id="avg-tmax">-- °C</strong>
+                </div>
+                <div class="detail-item">
+                  <span>Average Precipitation</span>
+                  <strong id="avg-precip">-- mm/day</strong>
+                </div>
+                <div class="detail-item">
+                  <span>Average Wind Speed</span>
+                  <strong id="avg-wind">-- m/s</strong>
+                </div>
+                <div class="detail-item">
+                  <span>Average Relative Humidity</span>
+                  <strong id="avg-humidity">--%</strong>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- NASA Dataset Source Catalog -->
+        <section class="surface panel source-list-card">
+          <div class="panel-header" style="margin-bottom: 8px;">
+            <div>
+              <h2 style="margin: 0 0 6px 0;">NASA Earth Science Source Catalog</h2>
+              <p style="margin: 0; color: var(--muted); font-size: 0.9rem;">Official datasets and visualization references referenced in calculations.</p>
+            </div>
+          </div>
+          <div class="source-grid" id="sources-container">
+            <!-- Filled dynamically -->
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // --- STATE MANAGEMENT ---
+    let map = null;
+    let marker = null;
+    let aiChart = null;
+    let comparisonChart = null;
+    let simulationInterval = null;
+    let localPollingInterval = null;
+    let lastQueryReport = null; // Stored to enable client-side downloads
+    
+    const LOCAL_API_URL = "http://localhost/Final/Nasa_Oct/api_prediction.php";
+    const START_YEAR = 1985;
+    const WINDOW_DAYS = 7;
+    
+    // Condition Emojis mapping
+    const conditionEmojis = {
+      'very-hot': '🔥',
+      'very-cold': '❄️',
+      'very-wet': '🌧️',
+      'very-windy': '💨',
+      'very-uncomfortable': '⚠️'
+    };
+
+    const conditionLabels = {
+      'very-hot': 'Very Hot',
+      'very-cold': 'Very Cold',
+      'very-wet': 'Very Wet',
+      'very-windy': 'Very Windy',
+      'very-uncomfortable': 'Very Uncomfortable'
+    };
+
+    const conditionThresholds = {
+      'very-hot': 'T2M_MAX >= 35 C',
+      'very-cold': 'T2M_MIN <= 5 C',
+      'very-wet': 'PRECTOTCORR >= 5 mm/day',
+      'very-windy': 'WS10M >= 8 m/s',
+      'very-uncomfortable': 'Heat index >= 38 C using T2M_MAX and RH2M'
+    };
+
+    // NASA Sources catalog
+    const nasaSources = [
+      {
+        name: "NASA POWER Daily API",
+        role: "Active data source used by the app for daily meteorology time series",
+        url: "https://power.larc.nasa.gov/api/pages/?urls.primaryName=Daily+API"
+      },
+      {
+        name: "NASA POWER Meteorology Overview",
+        role: "Methodology reference for MERRA-2-derived meteorological parameters",
+        url: "https://power.larc.nasa.gov/docs/methodology/meteorology/"
+      },
+      {
+        name: "GES DISC OPeNDAP / Hyrax",
+        role: "Official NASA remote subsetting and access path for gridded datasets",
+        url: "https://opendap.earthdata.nasa.gov/"
+      },
+      {
+        name: "Giovanni",
+        role: "Official NASA visualization and analysis reference for maps and time series",
+        url: "https://www.earthdata.nasa.gov/topics/human-dimensions/natural-hazards/data-access-tools"
+      },
+      {
+        name: "Earthdata Search",
+        role: "Official NASA data discovery and filtering portal",
+        url: "https://www.earthdata.nasa.gov/learn/articles/ed-search_esds"
+      },
+      {
+        name: "Worldview",
+        role: "Official NASA imagery reference for visual context and comparison",
+        url: "https://www.earthdata.nasa.gov/news/feature-articles/data-tool-focus-nasa-worldview"
+      },
+      {
+        name: "Data Rods for Hydrology",
+        role: "Official NASA point time-series reference for hydrologic workflows",
+        url: "https://www.earthdata.nasa.gov/news/feature-articles/data-tool-focus-data-rods-hydrology"
+      },
+      {
+        name: "Earthdata Tutorials",
+        role: "Official NASA tutorials and Jupyter-style learning resources",
+        url: "https://www.earthdata.nasa.gov/learn/tutorials"
+      }
+    ];
+
+    // --- TAB SWITCHING SYSTEM ---
+    function switchTab(tabId, event) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('is-active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('is-active'));
+      
+      const targetTab = document.getElementById(tabId);
+      if (targetTab) {
+        targetTab.classList.add('is-active');
+      }
+      
+      if (event) {
+        event.currentTarget.classList.add('is-active');
+      }
+
+      if (tabId === 'nasa-explorer') {
+        setTimeout(() => {
+          initMap();
+          if (map) {
+            map.invalidateSize();
+          }
+        }, 150);
+      }
+    }
+
+    // --- INITIALIZE MAP ---
+    function initMap() {
+      if (map) return;
+      const mapElement = document.getElementById("map");
+      if (!mapElement) return;
+
+      const latInput = document.getElementById("lat");
+      const lonInput = document.getElementById("lon");
+      const placeInput = document.getElementById("place");
+
+      // Default coordinates (Cairo)
+      const initialLat = parseFloat(latInput.value || "30.0444");
+      const initialLon = parseFloat(lonInput.value || "31.2357");
+
+      map = L.map("map", { zoomControl: false }).setView([initialLat, initialLon], 5);
+      L.control.zoom({ position: "bottomright" }).addTo(map);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors",
+        maxZoom: 18
+      }).addTo(map);
+
+      const icon = L.divIcon({
+        className: "",
+        html: '<div class="map-marker"></div>',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+      });
+
+      const updateMarker = (lat, lon, label) => {
+        if (marker) {
+          marker.remove();
+        }
+        marker = L.marker([lat, lon], { icon }).addTo(map);
+        marker.bindPopup(label).openPopup();
+        
+        latInput.value = Number(lat).toFixed(5);
+        lonInput.value = Number(lon).toFixed(5);
+        placeInput.value = label;
+      };
+
+      map.on("click", (e) => {
+        const lat = e.latlng.lat;
+        const lon = e.latlng.lng;
+        const label = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+        updateMarker(lat, lon, label);
+        map.flyTo([lat, lon], Math.max(map.getZoom(), 7), { duration: 0.8 });
+      });
+
+      window.globalUpdateMarker = updateMarker;
+    }
+
+    // --- GEOLOCATION SETTING ---
+    document.addEventListener("DOMContentLoaded", () => {
+      // Set current date as default prefill
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('targetDate').value = today;
+
+      const geoButton = document.getElementById("geoButton");
+      const placeInput = document.getElementById("place");
+      const latInput = document.getElementById("lat");
+      const lonInput = document.getElementById("lon");
+
+      if (geoButton) {
+        geoButton.addEventListener("click", () => {
+          if (!navigator.geolocation) {
+            alert("Geolocation is not supported by your browser.");
+            return;
+          }
+          geoButton.disabled = true;
+          geoButton.style.opacity = "0.5";
+          
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const lat = pos.coords.latitude;
+              const lon = pos.coords.longitude;
+              const label = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+              if (placeInput) placeInput.value = label;
+              if (latInput) latInput.value = lat.toFixed(5);
+              if (lonInput) lonInput.value = lon.toFixed(5);
+              
+              if (typeof window.globalUpdateMarker === "function") {
+                window.globalUpdateMarker(lat, lon, label);
+              }
+              if (map) {
+                map.flyTo([lat, lon], 8);
+              }
+              geoButton.disabled = false;
+              geoButton.style.opacity = "1";
+            },
+            (err) => {
+              alert("Unable to retrieve location: " + err.message);
+              geoButton.disabled = false;
+              geoButton.style.opacity = "1";
+            }
+          );
+        });
+      }
+
+      // Start hybrid telemetry loops
+      initTelemetry();
+    });
+
+    // --- HYBRID AI TELEMETRY MANAGER ---
+    let simulatedHistory = [];
+    const maxHistoryRecords = 30;
+
+    function initTelemetry() {
+      // Setup Chart.js first with empty/loading state
+      initAIChart([], [], []);
+      
+      // Try local XAMPP first
+      checkLocalConnection()
+        .then(isLocalAvailable => {
+          if (isLocalAvailable) {
+            // Local XAMPP API is active! Start polling local API
+            document.getElementById("api-status-chip").innerText = "Local Telemetry Active";
+            document.getElementById("api-status-chip").style.color = "var(--success)";
+            document.getElementById("api-status-chip").style.borderColor = "var(--success)";
+            pollLocalTelemetry();
+            localPollingInterval = setInterval(pollLocalTelemetry, 4000);
+          } else {
+            // Fallback to Simulated Live Demo Mode
+            startSimulatedTelemetry();
+          }
+        })
+        .catch(() => {
+          startSimulatedTelemetry();
+        });
+    }
+
+    function checkLocalConnection() {
+      return fetch(LOCAL_API_URL, { method: 'GET', mode: 'cors' })
+        .then(res => res.ok)
+        .catch(() => false);
+    }
+
+    function pollLocalTelemetry() {
+      fetch(LOCAL_API_URL, { method: 'GET', mode: 'cors' })
+        .then(res => {
+          if (!res.ok) throw new Error("Offline");
+          return res.json();
+        })
+        .then(data => {
+          updateAIDashboardUI(data, "Local Station");
+        })
+        .catch(err => {
+          console.warn("Connection to local telemetry dropped, transitioning to simulation...", err);
+          clearInterval(localPollingInterval);
+          startSimulatedTelemetry();
+        });
+    }
+
+    function startSimulatedTelemetry() {
+      document.getElementById("api-status-chip").innerText = "Interactive Demo Mode";
+      document.getElementById("api-status-chip").style.color = "var(--warning)";
+      document.getElementById("api-status-chip").style.borderColor = "var(--warning)";
+      
+      // Pre-fill simulated history array so graphs display immediately
+      let baseTime = Date.now() - (maxHistoryRecords * 4000);
+      let temp = 34.2;
+      for (let i = 0; i < maxHistoryRecords; i++) {
+        temp += (Math.random() - 0.48) * 0.6;
+        let hum = Math.round(52 + Math.random() * 8);
+        let pres = Math.round(1011 + Math.random() * 4);
+        let pred = temp + (Math.random() - 0.5) * 0.25;
+        let ts = new Date(baseTime + (i * 4000)).toISOString();
+        
+        simulatedHistory.push({
+          created_at: ts,
+          predicted_temperature: pred,
+          weather_condition: temp > 35 ? "Hot" : "Warm",
+          confidence: Math.round(75 + Math.random() * 20),
+          source: "Simulated Model",
+          raw_input: {
+            temperature: temp,
+            humidity: hum,
+            pressure: pres
+          }
+        });
+      }
+
+      runSimulationStep();
+      simulationInterval = setInterval(runSimulationStep, 4000);
+    }
+
+    function runSimulationStep() {
+      // Generate next reading
+      const lastRec = simulatedHistory[simulatedHistory.length - 1];
+      let newTemp = lastRec.raw_input.temperature + (Math.random() - 0.48) * 0.55;
+      newTemp = Math.max(30.0, Math.min(newTemp, 42.0)); // Cap to realistic values
+      
+      const newHum = Math.round(Math.max(30, Math.min(85, lastRec.raw_input.humidity + (Math.random() - 0.5) * 3)));
+      const newPres = Math.round(Math.max(1005, Math.min(1020, lastRec.raw_input.pressure + (Math.random() - 0.5) * 1.5)));
+      
+      const predictedTemp = newTemp + (Math.random() - 0.5) * 0.3;
+      const confidence = Math.round(78 + Math.random() * 18);
+      
+      let condition = "Fair";
+      if (newTemp >= 38.0) condition = "Very Hot";
+      else if (newTemp >= 35.0) condition = "Hot";
+      else if (newHum >= 70) condition = "Humid";
+      
+      const newRecord = {
+        created_at: new Date().toISOString(),
+        predicted_temperature: predictedTemp,
+        weather_condition: condition,
+        confidence: confidence,
+        source: "AI Simulator",
+        raw_input: {
+          temperature: newTemp,
+          humidity: newHum,
+          pressure: newPres
+        }
+      };
+
+      simulatedHistory.push(newRecord);
+      if (simulatedHistory.length > maxHistoryRecords) {
+        simulatedHistory.shift();
+      }
+
+      const mockResponse = {
+        latest: newRecord,
+        history: [...simulatedHistory].reverse(),
+        status: "Running"
+      };
+
+      updateAIDashboardUI(mockResponse, "AI Simulator");
+    }
+
+    // --- RENDER TELEMETRY UI ---
+    function updateAIDashboardUI(data, sourceLabel) {
+      const latest = data.latest;
+      
+      document.getElementById('card-status').innerText = data.status || 'Idle';
+      document.getElementById('card-status').style.color = (data.status === 'Running') ? 'var(--success)' : 'var(--warning)';
+      
+      if (latest) {
+        const rawInput = latest.raw_input || {};
+        const predictedTemp = latest.predicted_temperature !== null ? latest.predicted_temperature.toFixed(2) + ' °C' : '--';
+        const curTemp = rawInput.temperature !== null ? rawInput.temperature.toFixed(2) + ' °C' : '--';
+        const curHum = rawInput.humidity !== null ? rawInput.humidity.toFixed(1) + '%' : '--';
+        const curPres = rawInput.pressure !== null ? rawInput.pressure.toFixed(1) + ' hPa' : '--';
+        const cond = latest.weather_condition || '--';
+        const conf = latest.confidence !== null ? latest.confidence.toFixed(0) + '%' : '--';
+
+        document.getElementById('card-predicted-temp').innerText = predictedTemp;
+        document.getElementById('card-humidity').innerText = curHum;
+        document.getElementById('card-pressure').innerText = curPres;
+        document.getElementById('card-condition').innerText = cond;
+        document.getElementById('card-confidence').innerText = 'Confidence: ' + conf;
+        document.getElementById('card-source').innerText = sourceLabel;
+        
+        if (latest.created_at) {
+          const dateObj = new Date(latest.created_at);
+          document.getElementById('card-last-time').innerText = dateObj.toLocaleTimeString('en-US', { hour12: false });
+        }
+      }
+
+      // Update Table
+      const history = data.history || [];
+      const tbody = document.getElementById('history-table-body');
+      
+      if (history.length > 0) {
+        tbody.innerHTML = '';
+        const displayHistory = history.slice(0, 8);
+        displayHistory.forEach(item => {
+          const tr = document.createElement('tr');
+          const timeString = item.created_at ? new Date(item.created_at).toLocaleTimeString('en-US', { hour12: false }) : '--';
+          const actual = (item.raw_input && item.raw_input.temperature !== null) ? item.raw_input.temperature.toFixed(2) + ' °C' : '--';
+          const predicted = item.predicted_temperature !== null ? item.predicted_temperature.toFixed(2) + ' °C' : '--';
+          const cond = item.weather_condition ? item.weather_condition : '--';
+
+          tr.innerHTML = `
+            <td>${timeString}</td>
+            <td>${actual}</td>
+            <td><strong style="color: var(--primary);">${predicted}</strong></td>
+            <td><span class="badge badge-blue">${cond}</span></td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } else {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--muted);">No predictions received yet.</td></tr>`;
+      }
+
+      // Update Chart
+      if (history.length > 0) {
+        const plotData = [...history].reverse().slice(-30);
+        const labels = plotData.map(item => item.created_at ? new Date(item.created_at).toLocaleTimeString('en-US', { hour12: false }) : '');
+        const actuals = plotData.map(item => (item.raw_input && item.raw_input.temperature !== null) ? item.raw_input.temperature : null);
+        const predicteds = plotData.map(item => item.predicted_temperature);
+        
+        initAIChart(labels, actuals, predicteds);
+      }
+    }
+
+    function initAIChart(labels, actuals, predicteds) {
+      const ctx = document.getElementById('predictionChart');
+      if (!ctx) return;
+
+      if (aiChart) {
+        aiChart.data.labels = labels;
+        aiChart.data.datasets[0].data = actuals;
+        aiChart.data.datasets[1].data = predicteds;
+        aiChart.update('none'); // Update quietly without layout reflows
+        return;
+      }
+
+      aiChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Actual Temp (°C)',
+              data: actuals,
+              borderColor: '#00b4d8',
+              backgroundColor: 'rgba(0, 180, 216, 0.1)',
+              borderWidth: 2,
+              pointRadius: 3,
+              tension: 0.25,
+              fill: false
+            },
+            {
+              label: 'Predicted Temp (°C)',
+              data: predicteds,
+              borderColor: '#0066cc',
+              backgroundColor: 'rgba(0, 102, 204, 0.1)',
+              borderWidth: 2,
+              pointStyle: 'rectRot',
+              pointRadius: 4,
+              tension: 0.25,
+              borderDash: [5, 5],
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { maxTicksLimit: 12, color: '#607089' }
+            },
+            y: {
+              beginAtZero: false,
+              grid: { color: '#eef2f9' },
+              ticks: { color: '#607089' }
+            }
+          },
+          plugins: {
+            legend: { position: 'top', labels: { boxWidth: 15, font: { weight: 'bold' } } }
+          }
+        }
+      });
+    }
+
+    // --- NASA EXPLORER PROCESSOR (Client-side implementation) ---
+    const form = document.getElementById("weatherForm");
+    const submitBtn = document.getElementById("submitButton");
+    
+    if (form) {
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        
+        const placeVal = document.getElementById("place").value.trim();
+        const dateVal = document.getElementById("targetDate").value;
+        const targetCond = document.getElementById("conditionSelect").value;
+        
+        let latVal = document.getElementById("lat").value;
+        let lonVal = document.getElementById("lon").value;
+
+        // Visual state: Loading
+        submitBtn.classList.add("is-loading");
+        submitBtn.disabled = true;
+        
+        try {
+          // 1. Resolve coordinates if missing or text search is input
+          let resolvedPlaceName = placeVal;
+          let lat = parseFloat(latVal);
+          let lon = parseFloat(lonVal);
+
+          const coordRegex = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/;
+          const match = placeVal.match(coordRegex);
+
+          if (match) {
+            lat = parseFloat(match[1]);
+            lon = parseFloat(match[2]);
+            resolvedPlaceName = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+          } else if (isNaN(lat) || isNaN(lon)) {
+            // Geocoding needed
+            const geocodeUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(placeVal)}&format=json&limit=1`;
+            const geoRes = await fetch(geocodeUrl, {
+              headers: { 'Accept': 'application/json' }
+            });
+            if (!geoRes.ok) throw new Error("Could not resolve location. Geocoding service error.");
+            const geoData = await geoRes.json();
+            if (!geoData || geoData.length === 0) {
+              throw new Error(`Location not found: "${placeVal}". Please select a location on the map or refine your query.`);
+            }
+            lat = parseFloat(geoData[0].lat);
+            lon = parseFloat(geoData[0].lon);
+            resolvedPlaceName = geoData[0].display_name || placeVal;
+          }
+
+          // Sync resolved values back to form
+          document.getElementById("lat").value = lat.toFixed(5);
+          document.getElementById("lon").value = lon.toFixed(5);
+          document.getElementById("place").value = resolvedPlaceName;
+          
+          if (typeof window.globalUpdateMarker === "function") {
+            window.globalUpdateMarker(lat, lon, resolvedPlaceName);
+          }
+
+          // 2. Fetch NASA POWER Daily Series
+          const endYear = Math.max(START_YEAR, new Date().getFullYear() - 1);
+          const startParam = `${START_YEAR}0101`;
+          const endParam = `${endYear}1231`;
+          
+          const nasaUrl = `https://power.larc.nasa.gov/api/temporal/daily/point?parameters=T2M,T2M_MAX,T2M_MIN,PRECTOTCORR,WS10M,RH2M&community=AG&longitude=${lon.toFixed(5)}&latitude=${lat.toFixed(5)}&start=${startParam}&end=${endParam}&format=JSON&time-standard=UTC`;
+          
+          const nasaRes = await fetch(nasaUrl);
+          if (!nasaRes.ok) throw new Error("NASA POWER API query failed. The service might be temporarily unavailable.");
+          
+          const rawNasaData = await nasaRes.json();
+          if (!rawNasaData || !rawNasaData.properties || !rawNasaData.properties.parameter) {
+            throw new Error("Invalid response format returned by NASA POWER API.");
+          }
+
+          // 3. Process data
+          const report = buildNasaAnalysisReport(rawNasaData, resolvedPlaceName, dateVal, targetCond, lat, lon);
+          
+          // Store report in global state for downloads
+          lastQueryReport = report;
+          
+          // 4. Render Results
+          renderReportUI(report);
+          
+        } catch (err) {
+          console.error(err);
+          showExplorerError(err.message);
+        } finally {
+          submitBtn.classList.remove("is-loading");
+          submitBtn.disabled = false;
+        }
+      });
+    }
+
+    // --- NATIVE ALGORITHMS PORT ---
+    function buildNasaAnalysisReport(rawNasa, place, targetDate, selectedCondition, lat, lon) {
+      const parameters = rawNasa.properties.parameter;
+      const targetDateObj = new Date(targetDate);
+      const targetMonth = targetDateObj.getMonth();
+      const targetDay = targetDateObj.getDate();
+      
+      const samples = [];
+      const t2m = parameters['T2M'] || {};
+      const tmax = parameters['T2M_MAX'] || {};
+      const tmin = parameters['T2M_MIN'] || {};
+      const precip = parameters['PRECTOTCORR'] || {};
+      const wind = parameters['WS10M'] || {};
+      const humidity = parameters['RH2M'] || {};
+
+      for (const dateKey in t2m) {
+        const val = t2m[dateKey];
+        if (val === null || val <= -900) continue;
+
+        // Parse key e.g. "20230702"
+        const y = parseInt(dateKey.substring(0, 4));
+        const m = parseInt(dateKey.substring(4, 6));
+        const d = parseInt(dateKey.substring(6, 8));
+        const candDate = new Date(y, m - 1, d);
+        
+        if (isNaN(candDate.getTime())) continue;
+
+        // Check if date falls within seasonal +/- 7 days window
+        if (!isWithinSeasonalWindow(targetMonth, targetDay, candDate)) continue;
+
+        const tx = tmax[dateKey];
+        const tn = tmin[dateKey];
+        const pr = precip[dateKey];
+        const wd = wind[dateKey];
+        const hm = humidity[dateKey];
+
+        if (tx === null || tx <= -900 || tn === null || tn <= -900 || 
+            pr === null || pr <= -900 || wd === null || wd <= -900 || 
+            hm === null || hm <= -900) {
+          continue;
+        }
+
+        samples.push({
+          date: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
+          year: y,
+          t2m: val,
+          tmax: tx,
+          tmin: tn,
+          precip: pr,
+          wind: wd,
+          humidity: hm,
+          heat_index: calculateHeatIndexC(tx, hm)
+        });
+      }
+
+      if (samples.length < 5) {
+        throw new Error("Insufficient data points in historical seasonal window for this location.");
+      }
+
+      // Calculate probabilities
+      const probabilities = calculateProbabilities(samples);
+      
+      // Auto-detect target condition if none selected
+      let finalCondition = selectedCondition;
+      if (!finalCondition) {
+        let highestProb = -1;
+        let highestCond = 'very-hot';
+        for (const cond in probabilities) {
+          if (probabilities[cond] > highestProb) {
+            highestProb = probabilities[cond];
+            highestCond = cond;
+          }
+        }
+        finalCondition = highestCond;
+      }
+
+      const selectedProbability = Math.round(probabilities[finalCondition]);
+      const trend = calculateTrend(samples, finalCondition);
+      const summary = summarizeSamples(samples);
+      const narrative = buildNarrative(finalCondition, selectedProbability, summary, trend, targetDate);
+
+      return {
+        query: {
+          place: place,
+          targetDate: targetDate,
+          condition: finalCondition,
+          lat: lat,
+          lon: lon
+        },
+        result: {
+          probability: selectedProbability,
+          probabilities: probabilities,
+          sample_count: samples.length,
+          year_count: [...new Set(samples.map(s => s.year))].length,
+          trend_delta: trend,
+          summary: summary,
+          narrative: narrative,
+          window_days: WINDOW_DAYS,
+          thresholds: conditionThresholds
+        },
+        sources: nasaSources
+      };
+    }
+
+    function isWithinSeasonalWindow(targetMonth, targetDay, candidateDate) {
+      const candMonth = candidateDate.getMonth();
+      const candDay = candidateDate.getDate();
+      
+      const baseYear = 2001; // Non-leap year
+      const t = Math.floor((new Date(baseYear, targetMonth, targetDay) - new Date(baseYear, 0, 0)) / 86400000);
+      const c = Math.floor((new Date(baseYear, candMonth, candDay) - new Date(baseYear, 0, 0)) / 86400000);
+      
+      const distance = Math.abs(c - t);
+      return Math.min(distance, 365 - distance) <= WINDOW_DAYS;
+    }
+
+    function calculateHeatIndexC(tempC, humidity) {
+      if (tempC < 27 || humidity < 40) {
+        return tempC;
+      }
+
+      const tempF = (tempC * 9 / 5) + 32;
+      const indexF = -42.379
+          + 2.04901523 * tempF
+          + 10.14333127 * humidity
+          - 0.22475541 * tempF * humidity
+          - 0.00683783 * tempF * tempF
+          - 0.05481717 * humidity * humidity
+          + 0.00122874 * tempF * tempF * humidity
+          + 0.00085282 * tempF * humidity * humidity
+          - 0.00000199 * tempF * tempF * humidity * humidity;
+
+      return (indexF - 32) * 5 / 9;
+    }
+
+    function meetsCondition(sample, condition) {
+      switch (condition) {
+        case 'very-hot': return sample.tmax >= 35.0;
+        case 'very-cold': return sample.tmin <= 5.0;
+        case 'very-wet': return sample.precip >= 5.0;
+        case 'very-windy': return sample.wind >= 8.0;
+        case 'very-uncomfortable': return sample.heat_index >= 38.0;
+        default: return false;
+      }
+    }
+
+    function calculateProbabilities(samples) {
+      const counts = {
+        'very-hot': 0,
+        'very-cold': 0,
+        'very-wet': 0,
+        'very-windy': 0,
+        'very-uncomfortable': 0
+      };
+
+      samples.forEach(sample => {
+        for (const cond in counts) {
+          if (meetsCondition(sample, cond)) {
+            counts[cond]++;
+          }
+        }
+      });
+
+      const total = Math.max(1, samples.length);
+      const probs = {};
+      for (const cond in counts) {
+        probs[cond] = Number(((counts[cond] / total) * 100).toFixed(1));
+      }
+      return probs;
+    }
+
+    function calculateTrend(samples, condition) {
+      const byYear = {};
+      samples.forEach(sample => {
+        if (!byYear[sample.year]) byYear[sample.year] = [];
+        byYear[sample.year].push(meetsCondition(sample, condition) ? 1 : 0);
+      });
+
+      const years = Object.keys(byYear).map(Number).sort((a, b) => a - b);
+      if (years.length < 10) return 0.0;
+
+      const windowSize = Math.min(10, Math.max(3, Math.floor(years.length / 2)));
+      const earlyYears = years.slice(0, windowSize);
+      const recentYears = years.slice(-windowSize);
+
+      const averageYearGroups = (yrGroup) => {
+        const values = [];
+        yrGroup.forEach(yr => {
+          const bucket = byYear[yr] || [];
+          if (bucket.length > 0) {
+            values.push((bucket.reduce((a, b) => a + b, 0) / bucket.length) * 100);
+          }
+        });
+        return values.length === 0 ? 0.0 : values.reduce((a, b) => a + b, 0) / values.length;
+      };
+
+      const early = averageYearGroups(earlyYears);
+      const recent = averageYearGroups(recentYears);
+
+      return Number((recent - early).toFixed(1));
+    }
+
+    function summarizeSamples(samples) {
+      const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+      const avg = (arr) => arr.length === 0 ? 0.0 : sum(arr) / arr.length;
+
+      return {
+        avg_tmax: Number(avg(samples.map(s => s.tmax)).toFixed(1)),
+        avg_tmin: Number(avg(samples.map(s => s.tmin)).toFixed(1)),
+        avg_precip: Number(avg(samples.map(s => s.precip)).toFixed(2)),
+        avg_wind: Number(avg(samples.map(s => s.wind)).toFixed(2)),
+        avg_humidity: Number(avg(samples.map(s => s.humidity)).toFixed(1)),
+        avg_heat_index: Number(avg(samples.map(s => s.heat_index)).toFixed(1))
+      };
+    }
+
+    function buildNarrative(condition, probability, summary, trend, targetDate) {
+      const condLabel = conditionLabels[condition];
+      const trendText = trend > 0 ? 'an increasing signal' : (trend < 0 ? 'a decreasing signal' : 'a fairly stable signal');
+      const dateText = new Date(targetDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+
+      return `${condLabel} conditions show a ${probability}% historical likelihood in the seasonal window around this date. Average max temperature is ${summary.avg_tmax} °C, precipitation averages ${summary.avg_precip} mm/day, wind averages ${summary.avg_wind} m/s, and the long-term comparison shows ${trendText} for ${dateText}.`;
+    }
+
+    // --- RENDER DYNAMIC RESULTS UI ---
+    function renderReportUI(report) {
+      const resSec = document.getElementById("resultsSection");
+      
+      // Cleanup previous classes/styles
+      const narrativeBox = document.getElementById("res-narrative-container");
+      narrativeBox.className = "narrative"; // Reset class
+
+      // Set values
+      const cond = report.query.condition;
+      const score = report.result.probability;
+      
+      document.getElementById("res-emoji").innerText = conditionEmojis[cond] || '🌤️';
+      document.getElementById("res-condition-label").innerText = conditionLabels[cond];
+      document.getElementById("res-likelihood").innerText = `Likelihood: ${score}%`;
+      
+      // Risk Band colors
+      let riskLabel = 'Lower Likelihood';
+      let riskColor = '#10b981';
+      let riskSoftBg = 'rgba(16, 185, 129, 0.1)';
+      
+      if (score >= 75) {
+        riskLabel = 'High Likelihood';
+        riskColor = '#ef4444';
+        riskSoftBg = 'rgba(239, 68, 68, 0.1)';
+      } else if (score >= 50) {
+        riskLabel = 'Elevated Likelihood';
+        riskColor = '#f59e0b';
+        riskSoftBg = 'rgba(245, 158, 11, 0.1)';
+      } else if (score >= 30) {
+        riskLabel = 'Moderate Likelihood';
+        riskColor = '#00b4d8';
+        riskSoftBg = 'rgba(0, 180, 216, 0.1)';
+      }
+
+      const badge = document.getElementById("res-badge");
+      badge.innerText = riskLabel;
+      badge.style.color = riskColor;
+      badge.style.backgroundColor = riskSoftBg;
+
+      document.getElementById("res-meta-years").innerText = `Based on ${report.result.year_count} years of historical observations`;
+      document.getElementById("res-narrative").innerText = report.result.narrative;
+
+      // Summary Table
+      document.getElementById("sum-place").innerText = report.query.place;
+      document.getElementById("sum-date").innerText = new Date(report.query.targetDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      document.getElementById("sum-condition").innerText = conditionLabels[cond];
+      document.getElementById("sum-coords").innerText = `${report.query.lat.toFixed(5)}, ${report.query.lon.toFixed(5)}`;
+      document.getElementById("sum-samples").innerText = `${report.result.sample_count} days`;
+      
+      const trendEl = document.getElementById("sum-trend");
+      trendEl.innerText = `${report.result.trend_delta >= 0 ? '+' : ''}${report.result.trend_delta}%`;
+      trendEl.style.color = report.result.trend_delta > 0 ? 'var(--warm)' : (report.result.trend_delta < 0 ? 'var(--success)' : 'var(--text)');
+
+      // Climate Averages
+      document.getElementById("avg-tmax").innerText = `${report.result.summary.avg_tmax} °C`;
+      document.getElementById("avg-precip").innerText = `${report.result.summary.avg_precip} mm/day`;
+      document.getElementById("avg-wind").innerText = `${report.result.summary.avg_wind} m/s`;
+      document.getElementById("avg-humidity").innerText = `${report.result.summary.avg_humidity}%`;
+
+      // Render Comparison Bar Chart
+      initComparisonChart(report.result.probabilities);
+
+      // Render Sources Catalog
+      renderSourcesCatalog(report.sources);
+
+      // Toggle display with animation
+      resSec.classList.add("show");
+      
+      // Scroll to results section smoothly
+      setTimeout(() => {
+        resSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+
+    function showExplorerError(errorText) {
+      const resSec = document.getElementById("resultsSection");
+      const narrativeBox = document.getElementById("res-narrative-container");
+      
+      document.getElementById("res-emoji").innerText = '⚠️';
+      document.getElementById("res-condition-label").innerText = "Data Fetch Error";
+      document.getElementById("res-likelihood").innerText = "Analysis Failed";
+      
+      const badge = document.getElementById("res-badge");
+      badge.innerText = "Error Status";
+      badge.style.color = "#ef4444";
+      badge.style.backgroundColor = "rgba(239, 68, 68, 0.1)";
+      
+      document.getElementById("res-meta-years").innerText = "Calculation halted";
+      document.getElementById("res-narrative").innerText = errorText;
+      narrativeBox.classList.add("error-narrative");
+
+      // Clear details
+      document.getElementById("sum-place").innerText = "--";
+      document.getElementById("sum-date").innerText = "--";
+      document.getElementById("sum-condition").innerText = "--";
+      document.getElementById("sum-coords").innerText = "--";
+      document.getElementById("sum-samples").innerText = "--";
+      document.getElementById("sum-trend").innerText = "--";
+      document.getElementById("avg-tmax").innerText = "--";
+      document.getElementById("avg-precip").innerText = "--";
+      document.getElementById("avg-wind").innerText = "--";
+      document.getElementById("avg-humidity").innerText = "--";
+
+      if (comparisonChart) {
+        comparisonChart.destroy();
+        comparisonChart = null;
+      }
+      document.getElementById("sources-container").innerHTML = "";
+
+      resSec.classList.add("show");
+      
+      setTimeout(() => {
+        resSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+
+    function initComparisonChart(probabilities) {
+      const canvas = document.getElementById("comparisonChart");
+      if (!canvas) return;
+
+      const labels = Object.keys(probabilities).map(key => conditionLabels[key]);
+      const data = Object.values(probabilities).map(val => Math.round(val));
+
+      if (comparisonChart) {
+        comparisonChart.destroy();
+      }
+
+      Chart.defaults.color = '#607089';
+      Chart.defaults.font.family = '"Space Grotesk", "Segoe UI", sans-serif';
+
+      comparisonChart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Risk Likelihood (%)',
+            data: data,
+            borderRadius: 8,
+            backgroundColor: [
+              'rgba(0, 102, 204, 0.85)',
+              'rgba(0, 180, 216, 0.85)',
+              'rgba(245, 158, 11, 0.85)',
+              'rgba(239, 68, 68, 0.85)',
+              'rgba(16, 185, 129, 0.85)'
+            ]
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: '#607089' }
+            },
+            y: {
+              beginAtZero: true,
+              suggestedMax: 100,
+              grid: { color: '#eef2f9' },
+              ticks: { color: '#607089' }
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(11, 34, 64, 0.95)',
+              titleColor: '#ffffff',
+              bodyColor: '#ffffff',
+              borderColor: '#dbeafe',
+              borderWidth: 1
+            }
+          }
+        }
+      });
+    }
+
+    function renderSourcesCatalog(sources) {
+      const container = document.getElementById("sources-container");
+      container.innerHTML = "";
+      
+      sources.forEach(src => {
+        const card = document.createElement("div");
+        card.className = "source-item";
+        card.innerHTML = `
+          <strong>${src.name}</strong>
+          <p>${src.role}</p>
+          <a href="${src.url}" target="_blank" rel="noopener noreferrer">Access Dataset</a>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // --- CLIENT-SIDE DOWNLOAD HANDLERS ---
+    document.getElementById("btn-download-json").addEventListener("click", () => {
+      if (!lastQueryReport) return;
+      const downloadPayload = {
+        query: {
+          place: lastQueryReport.query.place,
+          target_date: lastQueryReport.query.targetDate,
+          condition: conditionLabels[lastQueryReport.query.condition],
+          latitude: lastQueryReport.query.lat,
+          longitude: lastQueryReport.query.lon
+        },
+        results: lastQueryReport.result,
+        sources: lastQueryReport.sources,
+        metadata: {
+          app: "NASA Weather",
+          version: "1.0-Static",
+          generated_at: new Date().toISOString()
+        }
+      };
+      
+      const jsonStr = JSON.stringify(downloadPayload, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nasa-weather-${lastQueryReport.query.condition}-${lastQueryReport.query.targetDate}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+
+    document.getElementById("btn-download-csv").addEventListener("click", () => {
+      if (!lastQueryReport) return;
+      
+      const csvRows = [];
+      csvRows.push(['field', 'value'].join(','));
+      csvRows.push(['place', `"${lastQueryReport.query.place.replace(/"/g, '""')}"`].join(','));
+      csvRows.push(['target_date', lastQueryReport.query.targetDate].join(','));
+      csvRows.push(['condition', conditionLabels[lastQueryReport.query.condition]].join(','));
+      csvRows.push(['latitude', lastQueryReport.query.lat.toFixed(5)].join(','));
+      csvRows.push(['longitude', lastQueryReport.query.lon.toFixed(5)].join(','));
+      csvRows.push(['likelihood_score', lastQueryReport.result.probability].join(','));
+      
+      let riskLabel = 'Lower Likelihood';
+      if (lastQueryReport.result.probability >= 75) riskLabel = 'High Likelihood';
+      else if (lastQueryReport.result.probability >= 50) riskLabel = 'Elevated Likelihood';
+      else if (lastQueryReport.result.probability >= 30) riskLabel = 'Moderate Likelihood';
+      csvRows.push(['risk_band', riskLabel].join(','));
+      
+      csvRows.push(['sample_count', lastQueryReport.result.sample_count].join(','));
+      csvRows.push(['year_count', lastQueryReport.result.year_count].join(','));
+      csvRows.push(['seasonal_trend_signal', lastQueryReport.result.trend_delta].join(','));
+      
+      for (const key in lastQueryReport.result.probabilities) {
+        csvRows.push([`probability_${key}`, lastQueryReport.result.probabilities[key]].join(','));
+      }
+      for (const key in lastQueryReport.result.summary) {
+        csvRows.push([`summary_${key}`, lastQueryReport.result.summary[key]].join(','));
+      }
+      
+      const csvContent = csvRows.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nasa-weather-${lastQueryReport.query.condition}-${lastQueryReport.query.targetDate}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
